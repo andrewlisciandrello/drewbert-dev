@@ -1,0 +1,87 @@
+---
+# Disable grub, because we don't need shiny new versions and it was screwing with this update
+- name: Upgrade All Packages (Debian)
+  shell: echo 'grub-pc hold' | dpkg --set-selections ; apt-get -y update ; apt-get -y upgrade
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+
+# INSTALL STUFFS
+- name: Install Base Packages (Debian)
+  apt: "name={{ item }} state=latest"
+  with_items:
+    - autodir
+    - ansible
+    - arp-scan
+    - git
+    - iputils-arping
+    - iputils-ping
+    - mtr
+    - ngrep
+    - nmap
+    - python-dev
+    - python-pip
+    - python-virtualenv
+    - screen
+    - vim
+    - zsh
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+
+- name: Install PIP packages
+  pip: name={{ item }} state=latest
+  with_items:
+    - eventlet
+
+## SETUP MY USER
+- name: setup /etc/skel
+  file: 
+    state: directory
+    path: "/etc/skel/.ssh"
+    owner: root 
+    mode: 0700
+
+- name: Copy Drew's Keys to /etc/skel
+  copy:
+    src: "./files/ChromeBook.pub"
+    dest: "/etc/skel/.ssh/authorized_keys"
+    owner: root
+    mode: 0600  
+
+- name: Copy .vimrc to /etc/skel
+  copy:
+    src: "./files/vimrc"
+    dest: "/etc/skel/.vimrc"
+    owner: root
+    mode: 0600  
+
+- name: Enable HomeDir on Login (Debian)
+  copy:
+    src: "files/mkhomedir"
+    dest: /usr/share/pam-configs/mkhomedir
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+
+- name: Apply PAM Changes (Debian)
+  shell: EDITOR=files/pamworkaround.sh DEBIAN_FRONTEND=editor pam-auth-update
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+
+- name: MAKE USER DREW
+  user:
+    name: drew 
+    shell: /usr/bin/zsh
+
+- name: Sudo Access for drew user
+  lineinfile:
+    dest: /etc/sudoers
+    line: "drew  ALL=(ALL)       NOPASSWD: ALL"
+    state: present
+
+# CONFIGURE SSH
+- name: SSH Config - Disallow Password Login
+  lineinfile: dest=/etc/ssh/sshd_config regexp="^PasswordAuthentication" line="PasswordAuthentication no" state=present
+
+- name: SSH Config - Disallow Root Login
+  lineinfile: dest=/etc/ssh/sshd_config regexp="^PermitRootLogin" line="PermitRootLogin no" state=present
+
+- name: Restart SSH
+  service: name=sshd state=restarted 
+
+
+

@@ -1,0 +1,8 @@
+---
+
+- name: drewbert_dev
+  hosts: all
+  user: vagrant
+  sudo: yes
+  roles:
+    - common
